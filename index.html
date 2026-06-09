@@ -445,8 +445,8 @@ function escHtml(s) {
 }
 
 function downloadCSV() {
-    const headers = ['#', 'Student Number', 'Surname & Initial', 'Program', 'Group', 'Registered At'];
-    const rows = regs.map((r, i) => [i + 1, r.studentNo, r.surname, r.program, r.group, r.at]);
+    const headers = ['#', 'Student Number', 'Surname & Initial', 'Program', 'Registered At'];
+    const rows = regs.map((r, i) => [i + 1, r.studentNo, r.surname, r.program, r.at]);
     const csv = [headers, ...rows]
         .map(row => row.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(','))
         .join('\r\n');
@@ -468,7 +468,6 @@ async function refreshFromSheet() {
                 studentNo: String(r.studentNo),
                 surname:   String(r.surname),
                 program:   String(r.program),
-                group:     String(r.group),
                 at:        String(r.at)
             }));
             save(regs);
@@ -490,7 +489,6 @@ function renderAdmin() {
             <td>${escHtml(r.studentNo)}</td>
             <td>${escHtml(r.surname)}</td>
             <td>${escHtml(r.program)}</td>
-            <td>${escHtml(r.group)}</td>
             <td>${escHtml(r.at)}</td>
         </tr>`).join('');
 
@@ -506,7 +504,7 @@ function renderAdmin() {
                     ? `<div class="empty-state">No registrations on this device yet.<br>${SHEET_URL ? 'Click "Refresh from Sheets" to load all registrations.' : 'Registrations are stored per-device until Google Sheets is configured.'}</div>`
                     : `<table>
                         <thead>
-                            <tr><th>#</th><th>Student No</th><th>Surname &amp; Initial</th><th>Program</th><th>Group</th><th>Registered At</th></tr>
+                            <tr><th>#</th><th>Student No</th><th>Surname &amp; Initial</th><th>Program</th><th>Registered At</th></tr>
                         </thead>
                         <tbody>${rows}</tbody>
                        </table>`
@@ -547,11 +545,6 @@ function renderForm() {
                     <label for="program">Program</label>
                     <input id="program" type="text" placeholder="e.g. NC: Business Administration" required>
                 </div>
-                <div class="field">
-                    <label for="group">Group</label>
-                    <input id="group" type="text" placeholder="e.g. Group A" required>
-                </div>
-
                 <div class="actions">
                     <button type="submit" class="btn btn-primary" id="submitBtn">Register Now</button>
                     <button type="button" class="btn btn-outline" onclick="toggleQR()">📱 Share QR Code</button>
@@ -574,7 +567,6 @@ function handleSubmit(e) {
         studentNo: document.getElementById('studentNo').value.trim(),
         surname:   document.getElementById('surname').value.trim(),
         program:   document.getElementById('program').value.trim(),
-        group:     document.getElementById('group').value.trim(),
         at:        new Date().toLocaleString('en-ZA')
     };
 
