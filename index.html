@@ -557,7 +557,7 @@ function renderForm() {
     document.getElementById('regForm').addEventListener('submit', handleSubmit);
 }
 
-function handleSubmit(e) {
+async function handleSubmit(e) {
     e.preventDefault();
 
     if (regs.length >= MAX) {
@@ -565,16 +565,44 @@ function handleSubmit(e) {
         return;
     }
 
-    const entry = {
-        studentNo: document.getElementById('studentNo').value.trim(),
-        surname:   document.getElementById('surname').value.trim(),
-        program:   document.getElementById('program').value.trim(),
-        at:        new Date().toLocaleString('en-ZA')
-    };
+    const studentNo = document.getElementById('studentNo').value.trim();
+    const surname   = document.getElementById('surname').value.trim();
+    const program   = document.getElementById('program').value.trim();
 
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
+    btn.textContent = 'Checking…';
+
+    // Local duplicate check (same device)
+    if (regs.some(r => r.studentNo.toLowerCase() === studentNo.toLowerCase())) {
+        showAlreadyRegistered(studentNo, surname);
+        btn.disabled = false;
+        btn.textContent = 'Register Now';
+        return;
+    }
+
+    // Server-side duplicate check (across all devices)
+    if (SHEET_URL) {
+        try {
+            const res  = await fetch(SHEET_URL + '?check=' + encodeURIComponent(studentNo));
+            const data = await res.json();
+            if (data.exists) {
+                showAlreadyRegistered(studentNo, surname);
+                btn.disabled = false;
+                btn.textContent = 'Register Now';
+                return;
+            }
+        } catch (err) { /* proceed if check unreachable */ }
+    }
+
     btn.textContent = 'Registering…';
+
+    const entry = {
+        studentNo,
+        surname,
+        program,
+        at: new Date().toLocaleString('en-ZA')
+    };
 
     setTimeout(() => {
         regs.push(entry);
@@ -591,6 +619,17 @@ function handleSubmit(e) {
             btn.textContent = 'Register Now';
         }
     }, 350);
+}
+
+function showAlreadyRegistered(studentNo, surname) {
+    const el = document.getElementById('content');
+    el.innerHTML = `
+        <div class="full-state">
+            <div class="full-icon">✅</div>
+            <h2>Already Registered</h2>
+            <p><strong>${escHtml(surname || studentNo)}</strong> (${escHtml(studentNo)}) is already registered for Future Focus.<br>No need to register again!</p>
+            <button class="btn btn-outline" onclick="renderForm()">← Back</button>
+        </div>`;
 }
 
 function showToast(msg, type) {

@@ -58,6 +58,20 @@ function doGet(e) {
     const ss    = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Registrations');
 
+    // Duplicate check: ?check=studentNumber
+    if (e.parameter && e.parameter.check) {
+      const needle = String(e.parameter.check).trim().toLowerCase();
+      let exists = false;
+      if (sheet && sheet.getLastRow() > 1) {
+        const nums = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
+        exists = nums.some(r => String(r[0]).trim().toLowerCase() === needle);
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'ok', exists: exists }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Return all registrations for admin panel
     if (!sheet || sheet.getLastRow() <= 1) {
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'ok', count: 0, data: [] }))
