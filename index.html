@@ -315,6 +315,56 @@
             .header h1 { font-size: 26px; }
             .qr-float { left: 12px; right: 12px; bottom: 12px; }
         }
+
+        /* ── ADMIN PANEL ── */
+        .admin-body { padding: 24px 32px 32px; }
+
+        .admin-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .btn-sm { padding: 8px 14px; font-size: 13px; }
+        a.btn-sm { text-decoration: none; display: inline-flex; align-items: center; }
+
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+        thead th {
+            background: var(--blue-dark);
+            color: var(--white);
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .6px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:nth-child(even) td { background: var(--bg); }
+
+        .empty-state {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
@@ -353,6 +403,14 @@
 const MAX = 200;
 const KEY = 'futureFocusRegs';
 
+// ── GOOGLE SHEETS INTEGRATION ──────────────────────────────────────────────
+// 1. Follow setup instructions in Code.gs to create your Apps Script Web App
+// 2. Paste your Web App URL here:
+const SHEET_URL = '';
+// Admin panel password  →  open via: ?admin=orbit2025
+const ADMIN_PASS = 'orbit2025';
+// ──────────────────────────────────────────────────────────────────────────
+
 function load() {
     try { return JSON.parse(localStorage.getItem(KEY)) || []; }
     catch { return []; }
@@ -366,8 +424,95 @@ let regs = load();
 
 function updatePill() {
     document.getElementById('count').textContent = regs.length;
-    const pill = document.getElementById('pill');
-    pill.classList.toggle('full', regs.length >= MAX);
+    document.getElementById('pill').classList.toggle('full', regs.length >= MAX);
+}
+
+// Fire-and-forget POST to Google Sheets (no-cors avoids preflight issues)
+function syncToSheet(entry) {
+    if (!SHEET_URL) return;
+    fetch(SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(entry)
+    }).catch(() => {});
+}
+
+function escHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function downloadCSV() {
+    const headers = ['#', 'Student Number', 'Surname & Initial', 'Program', 'Group', 'Registered At'];
+    const rows = regs.map((r, i) => [i + 1, r.studentNo, r.surname, r.program, r.group, r.at]);
+    const csv = [headers, ...rows]
+        .map(row => row.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(','))
+        .join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+    a.download = 'future-focus-registrations.csv';
+    a.click();
+}
+
+async function refreshFromSheet() {
+    if (!SHEET_URL) return;
+    const btn = document.getElementById('refreshBtn');
+    if (btn) { btn.textContent = 'Loading…'; btn.disabled = true; }
+    try {
+        const res = await fetch(SHEET_URL);
+        const data = await res.json();
+        if (data.data && Array.isArray(data.data)) {
+            regs = data.data.map(r => ({
+                studentNo: String(r.studentNo),
+                surname:   String(r.surname),
+                program:   String(r.program),
+                group:     String(r.group),
+                at:        String(r.at)
+            }));
+            save(regs);
+            updatePill();
+            renderAdmin();
+            return;
+        }
+    } catch (e) {}
+    if (btn) { btn.textContent = '↻ Refresh from Sheets'; btn.disabled = false; }
+    alert('Could not reach Google Sheets. Make sure SHEET_URL is set and the Web App is deployed with "Anyone" access.');
+}
+
+function renderAdmin() {
+    document.querySelector('.wrapper').style.maxWidth = '960px';
+    const el = document.getElementById('content');
+    const rows = regs.map((r, i) => `
+        <tr>
+            <td>${i + 1}</td>
+            <td>${escHtml(r.studentNo)}</td>
+            <td>${escHtml(r.surname)}</td>
+            <td>${escHtml(r.program)}</td>
+            <td>${escHtml(r.group)}</td>
+            <td>${escHtml(r.at)}</td>
+        </tr>`).join('');
+
+    el.innerHTML = `
+        <div class="admin-body">
+            <div class="admin-actions">
+                <button class="btn btn-primary btn-sm" onclick="downloadCSV()">⬇ Download CSV</button>
+                ${SHEET_URL ? '<button id="refreshBtn" class="btn btn-outline btn-sm" onclick="refreshFromSheet()">↻ Refresh from Sheets</button>' : ''}
+                <a href="${window.location.pathname}" class="btn btn-outline btn-sm">← Back to Form</a>
+            </div>
+            <div class="table-wrap">
+                ${regs.length === 0
+                    ? `<div class="empty-state">No registrations on this device yet.<br>${SHEET_URL ? 'Click "Refresh from Sheets" to load all registrations.' : 'Registrations are stored per-device until Google Sheets is configured.'}</div>`
+                    : `<table>
+                        <thead>
+                            <tr><th>#</th><th>Student No</th><th>Surname &amp; Initial</th><th>Program</th><th>Group</th><th>Registered At</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                       </table>`
+                }
+            </div>
+        </div>`;
 }
 
 function renderForm() {
@@ -440,6 +585,7 @@ function handleSubmit(e) {
     setTimeout(() => {
         regs.push(entry);
         save(regs);
+        syncToSheet(entry);
         updatePill();
 
         if (regs.length >= MAX) {
@@ -479,7 +625,6 @@ function toggleQR() {
             });
             qrBuilt = true;
         }
-        // also build inline card QR on full state
         const inCard = document.getElementById('qrInCard');
         if (inCard && !inCard.classList.contains('show')) {
             inCard.classList.add('show');
@@ -494,7 +639,12 @@ function toggleQR() {
 
 // init
 updatePill();
-renderForm();
+const _params = new URLSearchParams(window.location.search);
+if (_params.get('admin') === ADMIN_PASS) {
+    renderAdmin();
+} else {
+    renderForm();
+}
 </script>
 </body>
 </html>
