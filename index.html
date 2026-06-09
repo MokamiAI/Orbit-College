@@ -476,11 +476,12 @@ async function refreshFromSheet() {
             return;
         }
     } catch (e) {}
+    renderAdmin(false);
     if (btn) { btn.textContent = '↻ Refresh from Sheets'; btn.disabled = false; }
-    alert('Could not reach Google Sheets. Make sure SHEET_URL is set and the Web App is deployed with "Anyone" access.');
+    alert('Could not reach Google Sheets. Check that the Web App is deployed with "Anyone" access.');
 }
 
-function renderAdmin() {
+function renderAdmin(loading) {
     document.querySelector('.wrapper').style.maxWidth = '960px';
     const el = document.getElementById('content');
     const rows = regs.map((r, i) => `
@@ -492,6 +493,17 @@ function renderAdmin() {
             <td>${escHtml(r.at)}</td>
         </tr>`).join('');
 
+    const tableBody = loading
+        ? `<div class="empty-state">Loading registrations from Google Sheets…</div>`
+        : regs.length === 0
+            ? `<div class="empty-state">No registrations found in Google Sheets yet.</div>`
+            : `<table>
+                <thead>
+                    <tr><th>#</th><th>Student No</th><th>Surname &amp; Initial</th><th>Program</th><th>Registered At</th></tr>
+                </thead>
+                <tbody>${rows}</tbody>
+               </table>`;
+
     el.innerHTML = `
         <div class="admin-body">
             <div class="admin-actions">
@@ -499,17 +511,7 @@ function renderAdmin() {
                 ${SHEET_URL ? '<button id="refreshBtn" class="btn btn-outline btn-sm" onclick="refreshFromSheet()">↻ Refresh from Sheets</button>' : ''}
                 <a href="${window.location.pathname}" class="btn btn-outline btn-sm">← Back to Form</a>
             </div>
-            <div class="table-wrap">
-                ${regs.length === 0
-                    ? `<div class="empty-state">No registrations on this device yet.<br>${SHEET_URL ? 'Click "Refresh from Sheets" to load all registrations.' : 'Registrations are stored per-device until Google Sheets is configured.'}</div>`
-                    : `<table>
-                        <thead>
-                            <tr><th>#</th><th>Student No</th><th>Surname &amp; Initial</th><th>Program</th><th>Registered At</th></tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                       </table>`
-                }
-            </div>
+            <div class="table-wrap">${tableBody}</div>
         </div>`;
 }
 
@@ -633,7 +635,8 @@ function toggleQR() {
 updatePill();
 const _params = new URLSearchParams(window.location.search);
 if (_params.get('admin') === ADMIN_PASS) {
-    renderAdmin();
+    renderAdmin(true);          // show loading state immediately
+    refreshFromSheet();         // auto-fetch from Google Sheets
 } else {
     renderForm();
 }
